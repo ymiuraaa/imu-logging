@@ -1,0 +1,4 @@
+[submodule "ros_tutorials"]
+	path = ros_tutorials
+	url = https://github.com/ros/ros_tutorials.git
+	branch = humble

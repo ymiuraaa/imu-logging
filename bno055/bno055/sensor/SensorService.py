@@ -194,7 +194,7 @@ class SensorService:
         q.w = self.unpackBytesToFloat(buf[24], buf[25])
         q.x = self.unpackBytesToFloat(buf[26], buf[27])
         q.y = self.unpackBytesToFloat(buf[28], buf[29])
-        q.z = self.unpackBytesToFloat(buf[30], buf[31])
+        q.z = self.unpackBytesToFloat(buf[30], buf[31])# modify here to add gravity?
         # TODO(flynneva): replace with standard normalize() function
         # normalize
         norm = sqrt(q.x * q.x + q.y * q.y + q.z * q.z + q.w * q.w)
@@ -205,6 +205,7 @@ class SensorService:
 
         imu_msg.orientation_covariance = imu_raw_msg.orientation_covariance
 
+        # question: why divide by acc_factor.values?
         imu_msg.linear_acceleration.x = \
             self.unpackBytesToFloat(buf[32], buf[33]) / self.param.acc_factor.value
         imu_msg.linear_acceleration.y = \
@@ -219,6 +220,12 @@ class SensorService:
         imu_msg.angular_velocity.z = \
             self.unpackBytesToFloat(buf[16], buf[17]) / self.param.gyr_factor.value
         imu_msg.angular_velocity_covariance = imu_raw_msg.angular_velocity_covariance
+        
+        # add the values from the gravity registers too
+        imu_msg.linear_acceleration.x += self.unpackBytesToFloat(buf[38], buf[39]) / self.param.acc_factor.value
+        imu_msg.linear_acceleration.y += self.unpackBytesToFloat(buf[40], buf[41]) / self.param.acc_factor.value
+        imu_msg.linear_acceleration.z += self.unpackBytesToFloat(buf[42], buf[43]) / self.param.acc_factor.value
+        
         self.pub_imu.publish(imu_msg)
 
         # Publish magnetometer data

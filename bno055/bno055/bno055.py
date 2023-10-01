@@ -1,35 +1,6 @@
-# Copyright 2021 AUTHORS
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#
-#    * Redistributions of source code must retain the above copyright
-#      notice, this list of conditions and the following disclaimer.
-#
-#    * Redistributions in binary form must reproduce the above copyright
-#      notice, this list of conditions and the following disclaimer in the
-#      documentation and/or other materials provided with the distribution.
-#
-#    * Neither the name of the AUTHORS nor the names of its
-#      contributors may be used to endorse or promote products derived from
-#      this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
-# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
-# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
-# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
-# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
-# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
-# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
-# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
-# POSSIBILITY OF SUCH DAMAGE.
-
-
 import sys
 import threading
-
+import math
 from bno055.connectors.i2c import I2C
 from bno055.connectors.uart import UART
 from bno055.error_handling.exceptions import BusOverRunException
@@ -37,29 +8,36 @@ from bno055.params.NodeParameters import NodeParameters
 from bno055.sensor.SensorService import SensorService
 import rclpy
 from rclpy.node import Node
-
+from sensor_msgs.msg import Imu
+from geometry_msgs.msg import Vector3
 
 class Bno055Node(Node):
-    """
-    ROS2 Node for interfacing Bosch Bno055 IMU sensor.
-
-    :param Node: ROS2 Node Class to initialize from
-    :type Node: ROS2 Node
-    :raises NotImplementedError: Indicates feature/function is not implemented yet.
-    """
-
     sensor = None
     param = None
+    # v0 goes in the order of x y z starting from index 0 
 
     def __init__(self):
-        # Initialize parent (ROS Node)
         super().__init__('bno055')
 
+        # Create a subscriber for the IMU topic
+        self.sub_imu = self.create_subscription(
+            Imu,
+            '/bno055/imu',  # Change to the actual IMU topic
+            self.imu_callback,
+            10  # Adjust the queue size as needed
+        )
+        self.v = Vector3()
+        self.v.x = 0
+        self.v.y = 0
+        self.v.z = 0
+        self.prev_time = None
+        self.curr_time = None
+        self.was_flipped = False
+        self.unflip = False
+
     def setup(self):
-        # Initialize ROS2 Node Parameters:
         self.param = NodeParameters(self)
 
-        # Get connector according to configured sensor connection type:
         if self.param.connection_type.value == UART.CONNECTIONTYPE_UART:
             connector = UART(self,
                              self.param.uart_baudrate.value,
@@ -70,85 +48,124 @@ class Bno055Node(Node):
                             self.param.i2c_bus.value,
                             self.param.i2c_addr.value)
         else:
-            raise NotImplementedError('Unsupported connection type: '
-                                      + str(self.param.connection_type.value))
+            raise NotImplementedError('Unsupported connection type: ' + str(self.param.connection_type.value))
 
         # Connect to BNO055 device:
+
         connector.connect()
-
-        # Instantiate the sensor Service API:
         self.sensor = SensorService(self, connector, self.param)
-
-        # configure imu
         self.sensor.configure()
 
+    def imu_callback(self, msg):
+        # Log current velocity (not acceleration) and orientation
+        linear_acceleration = msg.linear_acceleration
+        linear_velocity = self.calculate_linear_velocity(msg.linear_acceleration)
+
+        self.get_logger().info('Linear Velocity (meters/sec): {}'.format(linear_velocity))
+
+        # Log when the IMU flips over or returns to the upright position
+        if self.orientation_flipped(msg.linear_acceleration):
+            self.get_logger().info('IMU flipped over')
+        if self.unflip:
+            self.get_logger().info('IMU unflipped')
+
+        # Log a warning for sudden rapid acceleration (e.g., collision detection)
+        if self.detect_rapid_acceleration(msg.linear_acceleration):
+            self.get_logger().warn('Sudden rapid acceleration detected! Maybe crashed into something...')
+
+
+    def calculate_linear_velocity(self, linear_acceleration):
+        if self.prev_time is None:
+            self.prev_time = rclpy.clock.Clock().now()  # Initialize prev_time
+
+        if self.curr_time is None:
+            self.curr_time = rclpy.clock.Clock().now()  # Initialize curr_time
+
+        # Calculate time interval (in seconds) since the last callback
+        delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
+
+        # Calculate linear velocity using Euler method (assuming constant acceleration)
+        self.v.x += linear_acceleration.x * delta_time
+        self.v.y += linear_acceleration.y * delta_time
+        self.v.z += linear_acceleration.z * delta_time
+
+        # Update prev_time and curr_time for the next callback
+        self.prev_time = self.curr_time
+        self.curr_time = rclpy.clock.Clock().now()
+
+        # Calculate the magnitude of linear velocity
+        return math.sqrt(self.v.x ** 2 + self.v.y ** 2 + self.v.z ** 2)
+
+
+    def orientation_flipped(self, linear_acceleration):
+        # Check if the orientation has flipped over or returned to the upright position
+        # Jason suggestion: just check if lin_accel.z is negative or not
+        # if it's flipped that should be reading positive.
+
+        # case 1: flipped
+        if linear_acceleration.z > 0:
+            if self.was_flipped == False:
+                self.was_flipped = True
+                self.unflip = False
+            return True
+        # case 2: not flipped
+        elif linear_acceleration.z < 0:
+            if self.was_flipped:
+                self.unflip = True
+                self.was_flipped = False
+            return False
+        return False
+
+    def detect_rapid_acceleration(self, linear_acceleration):
+        # threshold arbitrary, test & change constant
+        threshold = 9.8 * 0.5
+        acceleration_magnitude = math.sqrt(
+            linear_acceleration.x ** 2 + linear_acceleration.y ** 2 + linear_acceleration.z ** 2
+        )
+        return acceleration_magnitude > threshold
+            
 
 def main(args=None):
     try:
-        """Main entry method for this ROS2 node."""
-        # Initialize ROS Client Libraries (RCL) for Python:
         rclpy.init()
-
-        # Create & initialize ROS2 node:
         node = Bno055Node()
         node.setup()
 
-        # Create lock object to prevent overlapping data queries
         lock = threading.Lock()
 
         def read_data():
-            """Periodic data_query_timer executions to retrieve sensor IMU data."""
             if lock.locked():
-                # critical area still locked
-                # that means that the previous data query is still being processed
                 node.get_logger().warn('Message communication in progress - skipping query cycle')
                 return
 
-            # Acquire lock before entering critical area to prevent overlapping data queries
             lock.acquire()
             try:
-                # perform synchronized block:
                 node.sensor.get_sensor_data()
             except BusOverRunException:
-                # data not available yet, wait for next cycle | see #5
                 return
             except ZeroDivisionError:
-                # division by zero in get_sensor_data, return
                 return
-            except Exception as e:  # noqa: B902
-                node.get_logger().warn('Receiving sensor data failed with %s:"%s"'
-                                       % (type(e).__name__, e))
+            except Exception as e:
+                node.get_logger().warn('Receiving sensor data failed with %s:"%s"' % (type(e).__name__, e))
             finally:
                 lock.release()
 
         def log_calibration_status():
-            """Periodic logging of calibration data (quality indicators)."""
             if lock.locked():
-                # critical area still locked
-                # that means that the previous data query is still being processed
                 node.get_logger().warn('Message communication in progress - skipping query cycle')
-                # traceback.print_exc()
                 return
 
-            # Acquire lock before entering critical area to prevent overlapping data queries
             lock.acquire()
             try:
-                # perform synchronized block:
                 node.sensor.get_calib_status()
-            except Exception as e:  # noqa: B902
-                node.get_logger().warn('Receiving calibration status failed with %s:"%s"'
-                                       % (type(e).__name__, e))
-                # traceback.print_exc()
+            except Exception as e:
+                node.get_logger().warn('Receiving calibration status failed with %s:"%s"' % (type(e).__name__, e))
             finally:
                 lock.release()
 
-        # start regular sensor transmissions:
-        # please be aware that frequencies around 30Hz and above might cause performance impacts:
-        # https://github.com/ros2/rclpy/issues/520
         f = 1.0 / float(node.param.data_query_frequency.value)
         data_query_timer = node.create_timer(f, read_data)
 
-        # start regular calibration status logging
         f = 1.0 / float(node.param.calib_status_frequency.value)
         status_timer = node.create_timer(f, log_calibration_status)
 
@@ -162,6 +179,7 @@ def main(args=None):
         try:
             node.destroy_timer(data_query_timer)
             node.destroy_timer(status_timer)
+            # node.destroy_timer()
         except UnboundLocalError:
             node.get_logger().info('No timers to shutdown')
         node.destroy_node()

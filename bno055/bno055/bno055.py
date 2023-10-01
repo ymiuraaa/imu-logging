@@ -27,9 +27,9 @@ class Bno055Node(Node):
             10  # Adjust the queue size as needed
         )
         self.v = Vector3()
-        self.v.x = 0
-        self.v.y = 0
-        self.v.z = 0
+        self.v.x = 0.0
+        self.v.y = 0.0
+        self.v.z = 0.0
         self.prev_time = None
         self.curr_time = None
         self.was_flipped = False

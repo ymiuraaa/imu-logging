@@ -107,18 +107,18 @@ class Bno055Node(Node):
             if self.was_flipped == False:
                 self.was_flipped = True
                 self.unflip = False
-            return True
+            return False
         # case 2: not flipped
         elif linear_acceleration.z < 0:
             if self.was_flipped:
                 self.unflip = True
                 self.was_flipped = False
-            return False
+            return True
         return False
 
     def detect_rapid_acceleration(self, linear_acceleration):
         # threshold arbitrary, test & change constant
-        threshold = 9.8 * 0.5
+        threshold = 9.8
         acceleration_magnitude = math.sqrt(
             linear_acceleration.x ** 2 + linear_acceleration.y ** 2 + linear_acceleration.z ** 2
         )

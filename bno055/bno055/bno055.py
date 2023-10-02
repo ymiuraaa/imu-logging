@@ -99,7 +99,7 @@ class Bno055Node(Node):
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
 
         # Define a smoothing factor (adjust as needed)
-        alpha = 0.5
+        alpha = 0.4
 
         # Apply a simple low-pass filter to linear acceleration
         self.filtered_linear_acceleration.x = (
@@ -160,7 +160,7 @@ class Bno055Node(Node):
 
     def detect_rapid_acceleration(self, linear_acceleration):
         # threshold arbitrary, test & change constant
-        threshold = 100
+        threshold = 10
         acceleration_magnitude = math.sqrt(
             linear_acceleration.x ** 2 + linear_acceleration.y ** 2 + linear_acceleration.z ** 2
         )            

@@ -35,6 +35,11 @@ class Bno055Node(Node):
         self.was_flipped = False
         self.unflip = False
 
+        self.filtered_linear_acceleration = Vector3()
+        self.filtered_linear_acceleration.x = 0.0
+        self.filtered_linear_acceleration.y = 0.0
+        self.filtered_linear_acceleration.z = 0.0
+
     def setup(self):
         self.param = NodeParameters(self)
 
@@ -66,8 +71,14 @@ class Bno055Node(Node):
         # Log when the IMU flips over or returns to the upright position
         if self.orientation_flipped(msg.linear_acceleration):
             self.get_logger().info('IMU flipped over')
+            self.v.x = 0.0
+            self.v.y = 0.0
+            self.v.z = 0.0
         if self.unflip:
             self.get_logger().info('IMU unflipped')
+            self.v.x = 0.0
+            self.v.y = 0.0
+            self.v.z = 0.0
 
         # Log a warning for sudden rapid acceleration (e.g., collision detection)
         if self.detect_rapid_acceleration(msg.linear_acceleration):
@@ -83,6 +94,20 @@ class Bno055Node(Node):
 
         # Calculate time interval (in seconds) since the last callback
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
+
+        # Define a smoothing factor (adjust as needed)
+        alpha = 0.2
+
+        # Apply a simple low-pass filter to linear acceleration
+        self.filtered_linear_acceleration.x = (
+            alpha * linear_acceleration.x + (1 - alpha) * self.filtered_linear_acceleration.x
+        )
+        self.filtered_linear_acceleration.y = (
+            alpha * linear_acceleration.y + (1 - alpha) * self.filtered_linear_acceleration.y
+        )
+        self.filtered_linear_acceleration.z = (
+            alpha * linear_acceleration.z + (1 - alpha) * self.filtered_linear_acceleration.z
+        )
 
         # Calculate linear velocity using Euler method (assuming constant acceleration)
         self.v.x += linear_acceleration.x * delta_time
@@ -121,7 +146,7 @@ class Bno055Node(Node):
         threshold = 9.8
         acceleration_magnitude = math.sqrt(
             linear_acceleration.x ** 2 + linear_acceleration.y ** 2 + linear_acceleration.z ** 2
-        )
+        )            
         return acceleration_magnitude > threshold
             
 

@@ -99,7 +99,7 @@ class Bno055Node(Node):
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
 
         # Define a smoothing factor (adjust as needed)
-        alpha = 0.3
+        alpha = 0.5
 
         # Apply a simple low-pass filter to linear acceleration
         self.filtered_linear_acceleration.x = (
@@ -143,6 +143,14 @@ class Bno055Node(Node):
             self.flip =  False
             self.unflip = True
         
+        # case 3: stays unflipped
+        if self.prev_z < 0 and linear_acceleration.z < 0:
+            self.unflip = False
+        
+        # case 4: stays flipped
+        if self.prev_z > 0 and linear_acceleration.z > 0:
+            self.flip = False
+
         # update previous z acceleration
         self.prev_z = linear_acceleration.z
         

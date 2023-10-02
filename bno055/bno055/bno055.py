@@ -96,7 +96,7 @@ class Bno055Node(Node):
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
 
         # Define a smoothing factor (adjust as needed)
-        alpha = 0.2
+        alpha = 0.3
 
         # Apply a simple low-pass filter to linear acceleration
         self.filtered_linear_acceleration.x = (

@@ -32,8 +32,11 @@ class Bno055Node(Node):
         self.v.z = 0.0
         self.prev_time = None
         self.curr_time = None
-        self.was_flipped = False
-        self.unflip = False
+
+        self.unflip = None
+        self.flip = None
+
+        self.prev_z = None
 
         self.filtered_linear_acceleration = Vector3()
         self.filtered_linear_acceleration.x = 0.0
@@ -110,10 +113,10 @@ class Bno055Node(Node):
         )
 
         # Calculate linear velocity using Euler method (assuming constant acceleration)
-        self.v.x += linear_acceleration.x * delta_time
-        self.v.y += linear_acceleration.y * delta_time
-        self.v.z += linear_acceleration.z * delta_time
-
+        self.v.x += (linear_acceleration.x * delta_time)
+        self.v.y += (linear_acceleration.y * delta_time)
+        self.v.z += (linear_acceleration.z * delta_time
+)
         # Update prev_time and curr_time for the next callback
         self.prev_time = self.curr_time
         self.curr_time = rclpy.clock.Clock().now()
@@ -127,23 +130,29 @@ class Bno055Node(Node):
         # Jason suggestion: just check if lin_accel.z is negative or not
         # if it's flipped that should be reading positive.
 
+        if self.prev_z is None:
+            self.prev_z = linear_acceleration.z
+
         # case 1: flipped
-        if linear_acceleration.z > 0:
-            if self.was_flipped == False:
-                self.was_flipped = True
-                self.unflip = False
-            return False
-        # case 2: not flipped
-        elif linear_acceleration.z < 0:
-            if self.was_flipped:
-                self.unflip = True
-                self.was_flipped = False
-            return True
-        return False
+        if self.prev_z < 0 and linear_acceleration.z > 0:
+            self.flip = True
+            self.unflip = False
+
+        # case 2: unflipped
+        if self.prev_z > 0 and linear_acceleration.z < 0:
+            self.flip =  False
+            self.unflip = True
+        
+        # update previous z acceleration
+        self.prev_z = linear_acceleration.z
+        
+        return self.flip
+
+
 
     def detect_rapid_acceleration(self, linear_acceleration):
         # threshold arbitrary, test & change constant
-        threshold = 9.8
+        threshold = 100
         acceleration_magnitude = math.sqrt(
             linear_acceleration.x ** 2 + linear_acceleration.y ** 2 + linear_acceleration.z ** 2
         )            

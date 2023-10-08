@@ -99,7 +99,7 @@ class Bno055Node(Node):
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
 
         # Define a smoothing factor (adjust as needed)
-        alpha = 0.3
+        alpha = 0.45
 
         # Apply a simple low-pass filter to linear acceleration
         self.filtered_linear_acceleration.x = (
@@ -112,17 +112,15 @@ class Bno055Node(Node):
             alpha * linear_acceleration.z + (1 - alpha) * self.filtered_linear_acceleration.z
         )
 
-        # Calculate linear velocity using Euler method (assuming constant acceleration)
-        self.v.x += (linear_acceleration.x * delta_time)
-        self.v.y += (linear_acceleration.y * delta_time)
-        self.v.z += (linear_acceleration.z * delta_time
-)
-        # Update prev_time and curr_time for the next callback
-        self.prev_time = self.curr_time
-        self.curr_time = rclpy.clock.Clock().now()
-
-        # Calculate the magnitude of linear velocity
-        return math.sqrt(self.v.x ** 2 + self.v.y ** 2 + self.v.z ** 2)
+        # Calculate linear velocity only if significant linear acceleration is detected
+        acceleration_magnitude = math.sqrt(
+            self.filtered_linear_acceleration.x ** 2 + self.filtered_linear_acceleration.y ** 2 + self.filtered_linear_acceleration.z ** 2
+        )
+        acceleration_threshold = 3.0
+        if acceleration_magnitude > acceleration_threshold:  # Define an appropriate threshold
+            self.v.x += (linear_acceleration.x * delta_time)
+            self.v.y += (linear_acceleration.y * delta_time)
+            self.v.z += (linear_acceleration.z * delta_time)
 
 
     def orientation_flipped(self, linear_acceleration):

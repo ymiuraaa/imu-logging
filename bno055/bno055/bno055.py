@@ -121,6 +121,7 @@ class Bno055Node(Node):
             self.v.x += (linear_acceleration.x * delta_time)
             self.v.y += (linear_acceleration.y * delta_time)
             self.v.z += (linear_acceleration.z * delta_time)
+        return math.sqrt( self.v.x ** 2 + self.v.y ** 2 + self.v.z ** 2)
 
 
     def orientation_flipped(self, linear_acceleration):

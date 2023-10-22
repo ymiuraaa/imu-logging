@@ -102,13 +102,13 @@ class Bno055Node(Node):
 
         # Apply a simple low-pass filter to linear acceleration
         self.filtered_linear_acceleration.x = (
-            alpha * linear_acceleration.x + (1 - alpha) * self.filtered_linear_acceleration.x
+            alpha * linear_acceleration.x + (1 - alpha) * linear_acceleration.x
         )
         self.filtered_linear_acceleration.y = (
-            alpha * linear_acceleration.y + (1 - alpha) * self.filtered_linear_acceleration.y
+            alpha * linear_acceleration.y + (1 - alpha) * linear_acceleration.y
         )
         self.filtered_linear_acceleration.z = (
-            alpha * linear_acceleration.z + (1 - alpha) * self.filtered_linear_acceleration.z
+            alpha * linear_acceleration.z + (1 - alpha) * linear_acceleration.z
         )
 
 

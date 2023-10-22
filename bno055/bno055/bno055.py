@@ -117,9 +117,9 @@ class Bno055Node(Node):
         )
         acceleration_threshold = 4.0
         if acceleration_magnitude > acceleration_threshold:  # Define an appropriate threshold
-            self.v.x += (linear_acceleration.x * delta_time)
-            self.v.y += (linear_acceleration.y * delta_time)
-            self.v.z += (linear_acceleration.z * delta_time)
+            self.v.x += (self.filtered_linear_acceleration.x * delta_time)
+            self.v.y += (self.filtered_linear_acceleration.y * delta_time)
+            self.v.z += (self.filtered_linear_acceleration.z * delta_time)
         return math.sqrt( self.v.x ** 2 + self.v.y ** 2 + self.v.z ** 2)
 
 

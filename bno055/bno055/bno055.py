@@ -111,6 +111,14 @@ class Bno055Node(Node):
             alpha * linear_acceleration.z + (1 - alpha) * self.filtered_linear_acceleration.z
         )
 
+
+        if linear_acceleration.x < 0.01:
+            self.filtered_linear_acceleration.x = 0
+        if linear_acceleration.y < 0.01:
+            self.filtered_linear_acceleration.y = 0
+        if linear_acceleration.z < 0.01:
+            self.filtered_linear_acceleration.z = 0    
+
         # Calculate linear velocity only if significant linear acceleration is detected
         acceleration_magnitude = math.sqrt(
             self.filtered_linear_acceleration.x ** 2 + self.filtered_linear_acceleration.y ** 2 + self.filtered_linear_acceleration.z ** 2

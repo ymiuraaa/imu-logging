@@ -98,7 +98,6 @@ class Bno055Node(Node):
         # Calculate time interval (in seconds) since the last callback
         delta_time = (self.curr_time - self.prev_time).nanoseconds / 1e9
 
-        # Define a smoothing factor (adjust as needed)
         alpha = 0.45
 
         # Apply a simple low-pass filter to linear acceleration
@@ -116,7 +115,7 @@ class Bno055Node(Node):
         acceleration_magnitude = math.sqrt(
             self.filtered_linear_acceleration.x ** 2 + self.filtered_linear_acceleration.y ** 2 + self.filtered_linear_acceleration.z ** 2
         )
-        acceleration_threshold = 3.0
+        acceleration_threshold = 4.0
         if acceleration_magnitude > acceleration_threshold:  # Define an appropriate threshold
             self.v.x += (linear_acceleration.x * delta_time)
             self.v.y += (linear_acceleration.y * delta_time)
